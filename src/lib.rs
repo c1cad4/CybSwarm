@@ -72,3 +72,84 @@ mod tests {
         );
     }
 }
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Vote {
+    pub agent_id: String,
+    pub claim: String,
+    pub source: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ConsensusError {
+    InsufficientReviewers,
+    DuplicateAgent,
+    MissingSource,
+    Disagreement,
+}
+
+/// Require at least two distinct identities and unanimous matching claims.
+/// Agent IDs are unverified strings; this is not Sybil resistance or truth validation.
+pub fn unanimous_review(votes: &[Vote]) -> Result<String, ConsensusError> {
+    if votes.len() < 2 {
+        return Err(ConsensusError::InsufficientReviewers);
+    }
+    let mut seen = std::collections::HashSet::new();
+    for vote in votes {
+        if !seen.insert(vote.agent_id.as_str()) {
+            return Err(ConsensusError::DuplicateAgent);
+        }
+        if vote.source.trim().is_empty() {
+            return Err(ConsensusError::MissingSource);
+        }
+        if vote.claim != votes[0].claim {
+            return Err(ConsensusError::Disagreement);
+        }
+    }
+    Ok(votes[0].claim.clone())
+}
+
+#[cfg(test)]
+mod consensus_tests {
+    use super::*;
+
+    fn vote(agent_id: &str, claim: &str) -> Vote {
+        Vote {
+            agent_id: agent_id.into(),
+            claim: claim.into(),
+            source: "test-source".into(),
+        }
+    }
+
+    #[test]
+    fn two_distinct_agents_agree() {
+        assert_eq!(
+            unanimous_review(&[vote("a", "result"), vote("b", "result")]),
+            Ok("result".into())
+        );
+    }
+
+    #[test]
+    fn duplicate_identity_rejected() {
+        assert_eq!(
+            unanimous_review(&[vote("a", "result"), vote("a", "result")]),
+            Err(ConsensusError::DuplicateAgent)
+        );
+    }
+
+    #[test]
+    fn disagreement_rejected() {
+        assert_eq!(
+            unanimous_review(&[vote("a", "result"), vote("b", "other")]),
+            Err(ConsensusError::Disagreement)
+        );
+    }
+
+    #[test]
+    fn single_agent_rejected() {
+        assert_eq!(
+            unanimous_review(&[vote("a", "result")]),
+            Err(ConsensusError::InsufficientReviewers)
+        );
+    }
+}
