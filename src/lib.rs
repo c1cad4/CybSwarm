@@ -13,10 +13,7 @@ pub enum Review {
     Rejected(&'static str),
 }
 
-pub fn independent_review(
-    proposal: &Evidence,
-    verification: &Evidence,
-) -> Review {
+pub fn independent_review(proposal: &Evidence, verification: &Evidence) -> Review {
     if proposal.author == verification.author {
         return Review::Rejected("self-review is not independent");
     }
